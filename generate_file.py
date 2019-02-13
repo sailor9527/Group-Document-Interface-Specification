@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-# 没有采用多线程的方式,经测试本版本可用 2019-01-10
-# 经测试完全符合要求
-# 在某个点报警结束时同时生成其他正在报警点的信息在一个文件中
+
 
 import csv
 import json
@@ -20,11 +18,10 @@ FILE_PATH = 'd:\upload\\YHQT\\10038788\\'
 # 接收端地址
 # HOST = "localhost"
 # PORT = 8000
-HOST = "10.25.9.201"
+HOST = "192.168.2.5"
 PORT = 9010
 SOCKETSERVER = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 SOCKETSERVER.bind((HOST,PORT))
-
 
 # 用于存放所有的点信息
 ALL_PNT = []        
@@ -42,7 +39,6 @@ GEN_ALARM_FILE = False
 # 周期内生成了故障文件
 GEN_FAULT_FILE = False
 
-
 # 用于存放故障点信息
 FAULT_PNT_INFO = {}
 # 用于存放故障点信息的数组
@@ -52,7 +48,6 @@ FAULT_PNT_INFO_LIST = []
 INTERVAL = 20
 # 用于记录第一次接收到数据包的时间
 T0 = None
-
 
 
 # 实时值池
@@ -84,7 +79,6 @@ def get_time_str(time_stamp):
 
 def create_file_name(file_type, create_time):
     '''生成指定文件名称格式'''
-    
     if file_type == 'pnt_def':
         file_name = "MNDY_" + create_time + ".txt"
     elif file_type == 'realtime_data':
@@ -92,7 +86,7 @@ def create_file_name(file_type, create_time):
     elif file_type == 'alarm_data':
         file_name = 'BJXX_' + create_time + ".txt"
     elif file_type == 'fault_data':
-        file_name = 'GZXX' + create_time + ".txt"
+        file_name = 'GZXX_' + create_time + ".txt"
     else:
         print "file type error"
     return file_name
@@ -101,9 +95,8 @@ def generate_pntdefdata(time_str):
     '''生成测点定义数据文件'''
     ALL_PNT = []        # 用于存放所有的点信息
     csv_file = csv.reader(open(PNT_LIST_FILE,'rb'))
-    next(csv_file)      # 跳过表头
-    # current_time = float(time.time())
-
+    # 跳过表头
+    next(csv_file)      
     for row in csv_file:
         if row[5] == '':            # row[5] 是上上限,如果测点没有上上限则不写入此条信息
             pnt_def = {
@@ -139,26 +132,45 @@ def generate_pntdefdata(time_str):
         ALL_PNT_INFO_LIST.append(ALL_PNT_INFO[row[8]])
 
         # 生成报警值的池
-        ALARM_PNT_INFO[row[8]] = {
-            'sensorID':row[0].decode('gb2312'),
-            'value':'',
-            'AlarmType':'',
-            'realTime':'',
-            'alarmUpperLimit':float(row[4].decode('gb2312')),
-            'alarmUpperLimit2':float(row[5].decode('gb2312')),
-            'maxValue':'',
-            'maxTime':'',
-            'minValue':'',
-            'minTime':'',
-            'alarmStartTime':None,
-            'alarmEndTime':None,
-            'is_in_alarm':False,
-            'alarm_record':{'alarmStartTime':None,'alarmEndTime':None},
-            'alarms':[],
-            'values':{}
-            # 'alarmMeasure':'',
-            # 'alarmMeasureTime':''
-        }
+        if row[5] == '':            # row[5] 是上上限,如果测点没有上上限则不写入此条信息
+            ALARM_PNT_INFO[row[8]] = {
+                'sensorID':row[0].decode('gb2312'),
+                'value':'',
+                'alarmType':'',
+                'realTime':'',
+                'alarmUpperLimit':float(row[4].decode('gb2312')),
+                # 'alarmUpperLimit2':float(row[5].decode('gb2312')),
+                'maxValue':'',
+                'maxTime':'',
+                'minValue':'',
+                'minTime':'',
+                'alarmStartTime':None,
+                'alarmEndTime':None,
+                'is_in_alarm':False,
+                'alarm_record':{'alarmStartTime':None,'alarmEndTime':None},
+                'alarms':[],
+                'values':{}
+            }
+        else:
+            ALARM_PNT_INFO[row[8]] = {
+                'sensorID':row[0].decode('gb2312'),
+                'value':'',
+                'alarmType':'',
+                'realTime':'',
+                'alarmUpperLimit':float(row[4].decode('gb2312')),
+                'alarmUpperLimit2':float(row[5].decode('gb2312')),
+                'maxValue':'',
+                'maxTime':'',
+                'minValue':'',
+                'minTime':'',
+                'alarmStartTime':None,
+                'alarmEndTime':None,
+                'is_in_alarm':False,
+                'alarm_record':{'alarmStartTime':None,'alarmEndTime':None},
+                'alarms':[],
+                'values':{}
+            }
+
         ALARM_PNT_INFO_LIST.append(ALARM_PNT_INFO[row[8]])
 
         # 生成故障值的池
@@ -177,7 +189,6 @@ def generate_pntdefdata(time_str):
     raw_data = json.dumps(ALL_PNT)
     file_path_name = FILE_PATH + create_file_name('pnt_def', time_str)
     save(raw_data,file_path_name)
-
 
 def update_data_pool():
     # print "-------------------->>>> in update thread", FAULT_PNT_INFO_LIST
@@ -198,13 +209,10 @@ def update_data_pool():
             generate_pntdefdata(time_str)
             gen_pntdef_file = False
         
-        
         # 记录第一次接收到数据包的时间 T0
         global T0
         if T0 == None:
             T0 = receive_time
-            # now = time.time()
-            # difference = now - T0
 
         for i in range(pnt_num):
             # key:点表号 = value: 每个数据的4-12位，即两个状态 + 真正的值 pnt_dip_num 为 DIP 发送的点编号
@@ -238,15 +246,13 @@ def update_data_pool():
                 print "start alarm -------> value is : " , pnt_value,pnt_info['sensorID']
                 pnt_alarm_info['values'][time_str] = pnt_value
                 pnt_alarm_info['value'] = pnt_value
-                pnt_alarm_info['AlarmType'] = pnt_status
+                pnt_alarm_info['alarmType'] = pnt_status
                 pnt_alarm_info['is_in_alarm'] = True
                 pnt_alarm_info['alarms'].append({'alarmStartTime':time_str,'alarmEndTime':0,'value':pnt_value})
 
-                # print "alarm_start_time",pnt_alarm_info['alarm_record']['alarmStartTime']
             # 上次扫描周期报警，这次扫描周期报警消除
             elif (pnt_alarm_info['is_in_alarm'] == True) and (pnt_status != '02'):
                 print "cancel alarm_value------- save   --->", pnt_value,pnt_info['sensorID']
-                # pnt_alarm_info['alarmEndTime'] = get_time_str(time_str)
                 pnt_alarm_info['values'][time_str] = pnt_value
                 pnt_alarm_info['value'] = pnt_value
                 pnt_alarm_info['is_in_alarm'] = False
@@ -254,8 +260,6 @@ def update_data_pool():
                 pnt_alarm_info['alarms'][-1]['alarmEndTime'] = time_str
                 # 若在固定生成时间之间产生报警文件，则将 GEN_ALARM_FILE 置 1
                 gen_alarm_file = True
-
-                # print "pnt_alarm_info------>>>>>>",pnt_alarm_info['alarms']
 
             # 上次扫描周期报警，这次扫描周期依然报警，需要记录报警期间的测点值
             elif (pnt_alarm_info['is_in_alarm'] == True and pnt_status == '02'):
@@ -269,33 +273,27 @@ def update_data_pool():
             pnt_fault_info = FAULT_PNT_INFO[str(pnt_dip_num)]
             # 上次扫描周期没故障，这次扫描周期故障
             if pnt_status == '10' and pnt_fault_info['is_in_fault'] == False:
-                print "++++++++++++++>>>>>>>>>>>>>>fault start" , pnt_status,pnt_fault_info['sensorID']
                 pnt_fault_info['status'] = pnt_status
                 pnt_fault_info['is_in_fault'] = True
                 pnt_fault_info['faults'].append({'faultStartTime':time_str, 'faultEndTime':0})
 
- 
             # 上次扫描周期故障，这次扫描周期故障消除
             elif pnt_fault_info['is_in_fault'] == True and pnt_status != '10':
-                print "+++++++++++++++>>>>>>>>>>>>>>>fault cancel", pnt_status,pnt_fault_info['sensorID']
-                # pnt_fault_info['faultEndTime'] = get_time_str(time_str)
                 pnt_fault_info['is_in_fault'] = False
                 pnt_fault_info['faults'][-1]['faultEndTime'] = time_str
                 gen_fault_file = True
-            
             else:
                 pass
 
         if receive_time - T0 >= INTERVAL:
             # 到达 20 秒间隔生成实时数据文件、报警文件和故障文件
-            print "-------------------------------------------------------------------deadline"
+            # print "-------------------------------------------------------------------deadline"
             T0 = receive_time
             gen_alarm_file = True
             gen_fault_file = True
             gen_realtime_file = True
             T0 = receive_time
 
-                
         # 集中生成文件
         if gen_realtime_file == True:
             generate_realtime_file(time_str)
@@ -308,8 +306,6 @@ def update_data_pool():
         if gen_fault_file == True:
             generater_fault_file(time_str)
 
-
-
 def generate_realtime_file(time):
     realtime_file_path = FILE_PATH + create_file_name('realtime_data',time)
     realtime_file_data = json.dumps(ALL_PNT_INFO_LIST)
@@ -319,15 +315,11 @@ def generate_alarm_file(time):
     alarm_file_path = FILE_PATH + create_file_name('alarm_data', time)
     alarm_file_data = []
     for item in ALARM_PNT_INFO_LIST:
-        # print "item['alarms']------->",item['alarms']
         if item['alarms'] != []:
             # 报警在一个周期内发生，有 starttime 和 endtime
             if item['alarms'][-1]['alarmEndTime'] != 0 :
-                # print "item_values-------->",item['values']
                 delete_min_value = min(item['values'],key = item['values'].get) # 返回最小值的删去，因为最小值已经是报警取消时的值了
                 del item['values'][delete_min_value]
-                # item['values'] = item['values'][:-1]
-                # print "----------item['values']", item['values']
                 max_time = max(item['values'],key = item['values'].get)     # 返回 item['values']中最大值的键：时间
                 max_value = item['values'][max_time]
                 min_time = min(item['values'],key = item['values'].get)     # 返回 item['values']中最大值的键：时间
@@ -336,7 +328,7 @@ def generate_alarm_file(time):
                 expect_format = {
                     'sensorID':item['sensorID'],
                     'value':item['value'],
-                    'AlarmType':item['AlarmType'],
+                    'alarmType':item['alarmType'],
                     'realTime':time,
                     'alarmUpperLimit':item['alarmUpperLimit'],
                     'alarmUpperLimit2':item['alarmUpperLimit2'],
@@ -355,7 +347,7 @@ def generate_alarm_file(time):
                 expect_format = {
                     'sensorID':item['sensorID'],
                     'value':item['value'],
-                    'AlarmType':item['AlarmType'],
+                    'alarmType':item['alarmType'],
                     'realTime':time,
                     'alarmUpperLimit':item['alarmUpperLimit'],
                     'alarmUpperLimit2':item['alarmUpperLimit2'],
@@ -423,7 +415,6 @@ def generater_fault_file(time):
                 item['faults'] = []
 
 if __name__ == "__main__":
-    # generate_pntdefdata()
     update_data_pool()
 
 

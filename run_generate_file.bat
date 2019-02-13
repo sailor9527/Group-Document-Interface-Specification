@@ -1,0 +1,2 @@
+python generate_file.py
+pause
